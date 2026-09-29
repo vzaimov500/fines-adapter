@@ -5,12 +5,14 @@
  *
  *   pnpm start [--out FILE] [--offline] [--force] [--config FILE]
  *              [--licence ID] [--permission-url URL] [--ref-key KEY] [--contact TEXT]
+ *              [--osm]
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { parseArgs } from 'node:util'
 import { buildCollection, DATASET_ID, validateCollection, type EmitOptions } from './emit.ts'
 import { FINES_LOCATIONS_URL, parseFinesFeed } from './fines.ts'
+import { toOsmXml } from './osmxml.ts'
 import { politeGet } from './http.ts'
 import { ADAPTER_NAME, ADAPTER_URL, ADAPTER_VERSION } from './version.ts'
 
@@ -25,6 +27,7 @@ const { values: args } = parseArgs({
     'ref-key': { type: 'string' },
     contact: { type: 'string', default: process.env.FINES_ADAPTER_CONTACT },
     'cache-dir': { type: 'string', default: '.cache' },
+    osm: { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h', default: false },
   },
 })
@@ -38,7 +41,8 @@ if (args.help) {
   --licence ID           SPDX id or LicenseRef-* (default LicenseRef-pending)
   --permission-url URL   where the data permission is documented
   --ref-key KEY          OSM key for the Fines id (default ref:fines)
-  --contact TEXT         contact added to the User-Agent (or env FINES_ADAPTER_CONTACT)`)
+  --contact TEXT         contact added to the User-Agent (or env FINES_ADAPTER_CONTACT)
+  --osm                  also write a JOSM reference layer (.osm, upload="never") next to --out`)
   process.exit(0)
 }
 
@@ -82,6 +86,13 @@ const features = doc.features as { properties: { notes?: string; tags: Record<st
 const withNotes = features.filter((f) => f.properties.notes).length
 log(`feed generated ${feed.generatedAt}, ${res.source}`)
 log(`wrote ${features.length} candidates to ${args.out} (${withNotes} with notes for the reviewer)`)
+if (args.osm) {
+  const osmPath = args.out.replace(/\.(geo)?json$/, '') + '.osm'
+  await writeFile(osmPath, toOsmXml(doc as unknown as Parameters<typeof toOsmXml>[0]))
+  log(
+    `wrote a JOSM reference layer to ${osmPath} (JOSM will not upload it; copy stations after checking)`,
+  )
+}
 if ((doc.metadata as { licence: string }).licence === 'LicenseRef-pending') {
   log(
     'licence: LicenseRef-pending — the feed publishes no licence. Review is possible; live upload stays blocked until permission is documented.',

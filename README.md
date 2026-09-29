@@ -19,6 +19,15 @@ pnpm start --offline       # use the cached feed only
 pnpm start --help
 ```
 
+### JOSM reference layer
+
+`pnpm start --osm` also writes `out/fines-charging-bg.osm`: one new node per
+location, carrying exactly the tags a reviewed _Add_ would write, and nothing
+else. The file is marked `upload="never"`, so JOSM refuses to upload the layer
+itself. Open it next to your data layer, check each station against imagery
+and what is already mapped (most Fines stations already exist), and copy only
+the ones you have checked.
+
 ## Being a good API citizen
 
 - One request per run at most, and none while the cached copy is fresh
