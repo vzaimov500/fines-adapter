@@ -1,0 +1,7 @@
+{
+  "$comment": "Opt-in. Tags copied verbatim from the Name Suggestion Index entry finescharging-59a92d (data/brands/amenity/charging_station.json, fetched 2026-09-28). Use: pnpm start --config config/nsi-brand.json",
+  "defaultTags": {
+    "brand": "Fines Charging",
+    "brand:wikidata": "Q128904354"
+  }
+}

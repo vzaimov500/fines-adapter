@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vzaimov500/osm-charge-review/schema/candidates.schema.json",
+  "title": "CandidateCollection",
+  "description": "Interchange format between provider adapters and osm-charge-review, format_version 1. See FORMAT.md for semantics and the validation rules that go beyond this schema.",
+  "type": "object",
+  "required": ["type", "metadata", "features"],
+  "properties": {
+    "type": {
+      "const": "FeatureCollection"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CandidateFeature"
+      }
+    }
+  },
+  "$defs": {
+    "Metadata": {
+      "title": "DatasetMetadata",
+      "type": "object",
+      "required": [
+        "format_version",
+        "dataset_id",
+        "dataset_name",
+        "source_url",
+        "licence",
+        "retrieved_at",
+        "adapter"
+      ],
+      "properties": {
+        "format_version": {
+          "description": "Interchange format version. Only \"1\" is known.",
+          "type": "string"
+        },
+        "dataset_id": {
+          "description": "Stable slug scoping all stored decisions. Must not change between runs of the same adapter for the same source.",
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "maxLength": 64
+        },
+        "dataset_name": {
+          "description": "Human-readable name shown in the interface.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "source_url": {
+          "description": "Where the data came from. Written to the changeset `source` tag.",
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://"
+        },
+        "licence": {
+          "description": "SPDX licence identifier (e.g. ODbL-1.0, CC0-1.0) or a LicenseRef-* identifier. LicenseRef-permission requires permission_url.",
+          "type": "string",
+          "pattern": "^(?:[A-Za-z0-9.+-]+|LicenseRef-[A-Za-z0-9.-]+)$"
+        },
+        "permission_url": {
+          "description": "Where the licence or explicit permission is documented, typically the import wiki page.",
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://"
+        },
+        "retrieved_at": {
+          "description": "When the adapter fetched the source data (ISO 8601, UTC recommended).",
+          "type": "string",
+          "format": "date-time"
+        },
+        "adapter": {
+          "title": "AdapterInfo",
+          "type": "object",
+          "required": ["name", "version"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50
+            },
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https?://"
+            }
+          },
+          "additionalProperties": false
+        },
+        "ref_key": {
+          "description": "The OSM tag key that carries the provider identifier (feature `ref`). Defaults to \"ref\". Namespaced keys such as \"ref:fines\" are recommended.",
+          "type": "string",
+          "pattern": "^ref(?::[a-z0-9_]+)*$",
+          "default": "ref"
+        },
+        "default_tags": {
+          "description": "Tags merged into every feature's tags; feature tags win on conflict.",
+          "$ref": "#/$defs/Tags"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Tags": {
+      "title": "OsmTags",
+      "type": "object",
+      "propertyNames": {
+        "minLength": 1,
+        "maxLength": 255
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255
+      }
+    },
+    "CandidateFeature": {
+      "title": "CandidateFeature",
+      "type": "object",
+      "required": ["type", "geometry", "properties"],
+      "properties": {
+        "type": {
+          "const": "Feature"
+        },
+        "id": {
+          "description": "Ignored. Use properties.source_id.",
+          "type": ["string", "number"]
+        },
+        "geometry": {
+          "$ref": "#/$defs/Point"
+        },
+        "properties": {
+          "$ref": "#/$defs/CandidateProperties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Point": {
+      "title": "PointGeometry",
+      "type": "object",
+      "required": ["type", "coordinates"],
+      "properties": {
+        "type": {
+          "const": "Point"
+        },
+        "coordinates": {
+          "description": "[longitude, latitude], WGS 84.",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2,
+          "tsType": "[longitude: number, latitude: number]"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CandidateProperties": {
+      "title": "CandidateProperties",
+      "type": "object",
+      "required": ["source_id", "tags"],
+      "properties": {
+        "source_id": {
+          "description": "Stable provider identifier, unique within the file.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "ref": {
+          "description": "Value to write under metadata.ref_key, if the project uses one.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "tags": {
+          "description": "Already-mapped OpenStreetMap tags. The adapter does the tagging.",
+          "type": "object",
+          "$ref": "#/$defs/Tags",
+          "minProperties": 1,
+          "tsType": "OsmTags"
+        },
+        "label": {
+          "description": "Display only. Never written to OpenStreetMap.",
+          "type": "string",
+          "maxLength": 500
+        },
+        "address": {
+          "description": "Display only, to orient the reviewer.",
+          "type": "string",
+          "maxLength": 500
+        },
+        "status": {
+          "enum": ["operational", "planned", "closed"]
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "position_accuracy_m": {
+          "description": "Widens the match radius for this candidate.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "notes": {
+          "description": "Free text from the adapter to the reviewer.",
+          "type": "string",
+          "maxLength": 5000
+        },
+        "source_raw": {
+          "description": "Original provider record, shown on demand.",
+          "type": "object",
+          "tsType": "Record<string, unknown>"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

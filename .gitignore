@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+out
+# HTTP cache of provider responses — provider data is not ours to redistribute
+.cache
+credentials*
+*.env
+.env*
