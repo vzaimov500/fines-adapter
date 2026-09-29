@@ -2,7 +2,7 @@
 import { Ajv2020 } from 'ajv/dist/2020.js'
 import addFormats from 'ajv-formats'
 import { readFileSync } from 'node:fs'
-import { FINES_LOCATIONS_URL, type FinesFeed } from './fines.ts'
+import { FINES_LOCATIONS_URL, type FinesConnector, type FinesFeed } from './fines.ts'
 import { mapLocation } from './mapping.ts'
 import { ADAPTER_NAME, ADAPTER_URL, ADAPTER_VERSION } from './version.ts'
 
@@ -25,7 +25,15 @@ export const DATASET_ID = 'fines-charging-bg'
 export const DEFAULT_REF_KEY = 'ref:fines'
 export const DEFAULT_LICENCE = 'LicenseRef-pending'
 
-export function buildCollection(feed: FinesFeed, opts: EmitOptions): Record<string, unknown> {
+/**
+ * `connectors` is the per-connector list from /v1/live.json, by location id.
+ * Without it, sockets and power come from each location's summary only.
+ */
+export function buildCollection(
+  feed: FinesFeed,
+  opts: EmitOptions,
+  connectors?: ReadonlyMap<number, readonly FinesConnector[]>,
+): Record<string, unknown> {
   const metadata: Record<string, unknown> = {
     format_version: '1',
     dataset_id: DATASET_ID,
@@ -42,7 +50,10 @@ export function buildCollection(feed: FinesFeed, opts: EmitOptions): Record<stri
   const features = [...feed.locations]
     .sort((a, b) => a.id - b.id)
     .map((loc) => {
-      const { tags, notes } = mapLocation(loc)
+      const own = connectors?.get(loc.id)
+      const { tags, notes } = mapLocation(loc, own)
+      if (connectors !== undefined && own === undefined)
+        notes.unshift('location missing from the per-connector list — per-connector power not used')
       const properties: Record<string, unknown> = {
         source_id: String(loc.id),
         ref: String(loc.id),

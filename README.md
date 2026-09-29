@@ -30,7 +30,8 @@ the ones you have checked.
 
 ## Being a good API citizen
 
-- One request per run at most, and none while the cached copy is fresh
+- At most one request per endpoint per run (the locations and the network-wide
+  connector list), and none while the cached copy is fresh
   (`Cache-Control: max-age`). Never more than one request per 5 minutes, even
   with `--force`.
 - Conditional requests (`If-None-Match` / `If-Modified-Since`): an unchanged

@@ -73,3 +73,36 @@ describe('buildCollection', () => {
     expect(validateCollection(d)[0]).toMatch(/licence/)
   })
 })
+
+describe('with the per-connector list', () => {
+  test('used where present; a missing location falls back and says so', () => {
+    const connectors = new Map([
+      [
+        10,
+        [
+          {
+            chargerId: 1,
+            name: 'CCS 1',
+            plugType: 'CCS Combo 2 Plug (Cable Attached)',
+            maxPowerKw: 150,
+          },
+          {
+            chargerId: 1,
+            name: 'CCS 2',
+            plugType: 'CCS Combo 2 Plug (Cable Attached)',
+            maxPowerKw: 150,
+          },
+        ],
+      ],
+    ])
+    const d = buildCollection(feed, { retrievedAt: '2026-09-28T22:00:16.000Z' }, connectors) as {
+      features: {
+        properties: { source_id: string; tags: Record<string, string>; notes?: string }
+      }[]
+    }
+    const byId = new Map(d.features.map((f) => [f.properties.source_id, f.properties]))
+    expect(byId.get('10')!.tags['socket:type2_combo:output']).toBe('150 kW')
+    expect(byId.get('2')!.notes).toMatch(/^location missing from the per-connector list/)
+    expect(validateCollection(d)).toEqual([])
+  })
+})

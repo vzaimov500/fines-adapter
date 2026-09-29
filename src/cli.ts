@@ -11,7 +11,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { parseArgs } from 'node:util'
 import { buildCollection, DATASET_ID, validateCollection, type EmitOptions } from './emit.ts'
-import { FINES_LOCATIONS_URL, parseFinesFeed } from './fines.ts'
+import {
+  FINES_LIVE_URL,
+  FINES_LOCATIONS_URL,
+  parseFinesFeed,
+  parseFinesLive,
+  type FinesConnector,
+} from './fines.ts'
 import { toOsmXml } from './osmxml.ts'
 import { politeGet } from './http.ts'
 import { ADAPTER_NAME, ADAPTER_URL, ADAPTER_VERSION } from './version.ts'
@@ -65,12 +71,32 @@ const res = await politeGet(FINES_LOCATIONS_URL, {
 })
 
 const feed = parseFinesFeed(JSON.parse(res.body))
+
+// Per-connector power and plug details: one more request per run, cached like
+// the feed. Only the fixed facts are used, never the live status. Optional: on
+// failure, every location falls back to its summary and says so in its notes.
+let connectors: Map<number, FinesConnector[]> | undefined
+try {
+  const live = await politeGet(FINES_LIVE_URL, {
+    cacheDir: args['cache-dir'],
+    userAgent,
+    accept: 'application/json',
+    force: args.force,
+    offline: args.offline,
+    log,
+  })
+  connectors = parseFinesLive(JSON.parse(live.body))
+} catch (e) {
+  log(
+    `per-connector list unavailable (${e instanceof Error ? e.message : String(e)}); using location summaries only`,
+  )
+}
 const opts: EmitOptions = { ...config, retrievedAt: res.fetchedAt }
 if (args.licence) opts.licence = args.licence
 if (args['permission-url']) opts.permissionUrl = args['permission-url']
 if (args['ref-key']) opts.refKey = args['ref-key']
 
-const doc = buildCollection(feed, opts)
+const doc = buildCollection(feed, opts, connectors)
 const errors = validateCollection(doc)
 if (errors.length > 0) {
   log(

@@ -5,6 +5,7 @@
  */
 export const FINES_LOCATIONS_URL = 'https://public.finescharging.com/v1/locations.geojson'
 export const FINES_DOCS_URL = 'https://finescharging.com/en/public-api'
+export const FINES_LIVE_URL = 'https://public.finescharging.com/v1/live.json'
 export const SUPPORTED_SCHEMA_VERSIONS = [1] as const
 
 export interface FinesPriceRange {
@@ -109,4 +110,50 @@ export function parseFinesFeed(data: unknown): FinesFeed {
     }
   })
   return { schemaVersion: v as number, generatedAt: data.generated_at, locations }
+}
+
+/**
+ * One connector from /v1/live.json. Only its fixed facts are read (which
+ * charger, plug type, power); status and availability are transient and never
+ * belong in OpenStreetMap.
+ */
+export interface FinesConnector {
+  /** The charger (Fines `station_id`) the connector belongs to. */
+  chargerId: number
+  name: string | null
+  plugType: string
+  maxPowerKw: number | null
+}
+
+/** Connectors per location id, from the network-wide live response. */
+export function parseFinesLive(data: unknown): Map<number, FinesConnector[]> {
+  if (!isObj(data)) throw new FeedError('live response is not an object')
+  const v = data.schema_version
+  if (!(SUPPORTED_SCHEMA_VERSIONS as readonly unknown[]).includes(v))
+    throw new FeedError(`live: unsupported schema_version ${JSON.stringify(v)}`)
+  if (!Array.isArray(data.locations)) throw new FeedError('live: locations is not an array')
+  const out = new Map<number, FinesConnector[]>()
+  data.locations.forEach((l: unknown, i) => {
+    const at = (msg: string) => new FeedError(`live locations[${i}]: ${msg}`)
+    if (!isObj(l) || !Number.isInteger(l.location_id)) throw at('location_id is not an integer')
+    if (!Array.isArray(l.connectors)) throw at('connectors is not an array')
+    out.set(
+      l.location_id as number,
+      l.connectors.map((c: unknown, j): FinesConnector => {
+        const bad = (msg: string) => at(`connectors[${j}]: ${msg}`)
+        if (!isObj(c) || !Number.isInteger(c.station_id)) throw bad('station_id is not an integer')
+        if (typeof c.plug_type !== 'string') throw bad('plug_type is not a string')
+        if (!strOrNull(c.name)) throw bad('name must be string or null')
+        if (c.max_power_kw !== null && !(isNum(c.max_power_kw) && c.max_power_kw > 0))
+          throw bad('max_power_kw must be positive or null')
+        return {
+          chargerId: c.station_id as number,
+          name: c.name,
+          plugType: c.plug_type,
+          maxPowerKw: c.max_power_kw as number | null,
+        }
+      }),
+    )
+  })
+  return out
 }

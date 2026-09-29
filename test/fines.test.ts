@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { FeedError, parseFinesFeed } from '../src/fines.ts'
+import { FeedError, parseFinesFeed, parseFinesLive } from '../src/fines.ts'
 import { feature, feedDoc } from './helpers.ts'
 
 describe('parseFinesFeed', () => {
@@ -62,5 +62,56 @@ describe('parseFinesFeed', () => {
   ])('rejects %s', (_, doc, msg) => {
     expect(() => parseFinesFeed(doc)).toThrow(FeedError)
     expect(() => parseFinesFeed(doc)).toThrow(msg)
+  })
+})
+
+describe('parseFinesLive', () => {
+  const live = (connectors: unknown[], extra: Record<string, unknown> = {}) => ({
+    schema_version: 1,
+    generated_at: '2026-09-29T12:00:00Z',
+    locations: [{ location_id: 6, status_updated_at: 'x', connectors }],
+    ...extra,
+  })
+  const connector = (over: Record<string, unknown> = {}) => ({
+    id: '5-1',
+    station_id: 5,
+    connector_id: 1,
+    name: 'CCS',
+    plug_type: 'CCS Combo 2 Plug (Cable Attached)',
+    max_power_kw: 80,
+    status: 'Available',
+    available: true,
+    ...over,
+  })
+
+  test('reads charger, name, plug and power; ignores status', () => {
+    const m = parseFinesLive(
+      live([
+        connector(),
+        connector({ station_id: 5, name: null, plug_type: 'CHAdeMO', max_power_kw: null }),
+      ]),
+    )
+    expect(m.get(6)).toEqual([
+      { chargerId: 5, name: 'CCS', plugType: 'CCS Combo 2 Plug (Cable Attached)', maxPowerKw: 80 },
+      { chargerId: 5, name: null, plugType: 'CHAdeMO', maxPowerKw: null },
+    ])
+  })
+
+  test.each([
+    [null, /not an object/],
+    [{ schema_version: 2, locations: [] }, /unsupported schema_version/],
+    [{ schema_version: 1, locations: {} }, /locations is not an array/],
+    [{ schema_version: 1, locations: [{ location_id: 'x', connectors: [] }] }, /location_id/],
+    [
+      { schema_version: 1, locations: [{ location_id: 1, connectors: {} }] },
+      /connectors is not an array/,
+    ],
+    [live([connector({ station_id: 'a' })]), /station_id/],
+    [live([connector({ plug_type: 3 })]), /plug_type/],
+    [live([connector({ name: 3 })]), /name/],
+    [live([connector({ max_power_kw: 0 })]), /max_power_kw/],
+  ])('rejects %j', (data, msg) => {
+    expect(() => parseFinesLive(data)).toThrow(FeedError)
+    expect(() => parseFinesLive(data)).toThrow(msg)
   })
 })
