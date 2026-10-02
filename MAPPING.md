@@ -66,7 +66,7 @@ Keys verified against <https://wiki.openstreetmap.org/wiki/Key:socket>.
 
 | OSM key                                          | Why not                                                                                                                                 |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                                           | Not set; the site label goes to `branch` (proposed in the community review).                                                              |
+| `name`                                           | Not set; the site label goes to `branch` (proposed in the community review).                                                            |
 | `capacity`                                       | The number of vehicles that can charge at once is not the connector count (a dual-cable charger often serves one car). Not in the feed. |
 | `operator`, `network`                            | See Brand.                                                                                                                              |
 | `charge`                                         | Volatile.                                                                                                                               |
