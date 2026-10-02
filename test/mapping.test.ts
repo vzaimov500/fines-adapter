@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { FinesConnector, FinesLocation } from '../src/fines.ts'
-import { formatKw, mapLocation, SOCKET_KEYS } from '../src/mapping.ts'
+import { branchFromName, formatKw, mapLocation, SOCKET_KEYS } from '../src/mapping.ts'
 
 const loc = (over: Partial<FinesLocation> = {}): FinesLocation => ({
   id: 1,
@@ -244,5 +244,25 @@ describe('per-connector list (live.json)', () => {
     expect(r.notes.join('\n')).toMatch(/Type 3/)
     expect(r.notes.join('\n')).toMatch(/unknown plug type "Mystery" ×2/)
     expect(r.notes.join('\n')).toMatch(/no connector type could be mapped/)
+  })
+})
+
+describe('branch', () => {
+  test.each([
+    ['FINES Gelemenovo', 'Gelemenovo'],
+    ['fines  Mladost 1 ', 'Mladost 1'],
+    ['FINES - Trakia 243 Burgas', 'Trakia 243 Burgas'],
+    ['Hotel Rostov', 'Hotel Rostov'],
+    ['Finesse Spa', 'Finesse Spa'], // only the whole word is the brand
+    ['FINES', undefined],
+    ['  ', undefined],
+    [null, undefined],
+  ])('%j → %j', (name, branch) => expect(branchFromName(name)).toBe(branch))
+
+  test('the site label becomes branch, never name', () => {
+    const { tags } = mapLocation(loc({ name: 'FINES Gelemenovo' }))
+    expect(tags.branch).toBe('Gelemenovo')
+    expect(tags.name).toBeUndefined()
+    expect(mapLocation(loc({ name: null })).tags.branch).toBeUndefined()
   })
 })

@@ -69,12 +69,29 @@ const maxKwFor = (socket: string): number =>
  * counts and powers come from the connectors themselves; without it, or when
  * it disagrees with the location summary, only the summary is used.
  */
+/**
+ * The feed's site label without the brand ("FINES Gelemenovo" → "Gelemenovo"):
+ * which location of the brand this is. The brand itself is tagged as `brand`.
+ */
+export function branchFromName(name: string | null): string | undefined {
+  if (name === null) return undefined
+  const branch = name
+    .trim()
+    .replace(/^fines\b[\s\-–:]*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return branch || undefined
+}
+
 export function mapLocation(
   loc: FinesLocation,
   connectors?: readonly FinesConnector[],
 ): MappedLocation {
   const tags: Record<string, string> = {}
   const notes: string[] = []
+
+  const branch = branchFromName(loc.name)
+  if (branch) tags.branch = branch
 
   if (connectors !== undefined && matchesSummary(loc, connectors, notes))
     socketsFromConnectors(connectors, tags, notes)
