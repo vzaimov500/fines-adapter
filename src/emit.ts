@@ -17,13 +17,15 @@ export interface EmitOptions {
   permissionUrl?: string
   /** OSM key for the Fines location id (provisional). */
   refKey?: string
-  /** Merged into every feature. Operator/network/brand come from NSI + Fines confirmation, never invented. */
+  /** Merged into every feature, over the defaults. Values come from the Name Suggestion Index, never invented. */
   defaultTags?: Record<string, string>
 }
 
 export const DATASET_ID = 'fines-charging-bg'
 export const DEFAULT_REF_KEY = 'ref:fines'
 export const DEFAULT_LICENCE = 'LicenseRef-pending'
+/** Copied verbatim from the Name Suggestion Index entry finescharging-59a92d. */
+export const BRAND_TAGS = { brand: 'Fines Charging', 'brand:wikidata': 'Q128904354' } as const
 
 /**
  * `connectors` is the per-connector list from /v1/live.json, by location id.
@@ -43,7 +45,7 @@ export function buildCollection(
     retrieved_at: opts.retrievedAt,
     adapter: { name: ADAPTER_NAME, version: ADAPTER_VERSION, url: ADAPTER_URL },
     ref_key: opts.refKey ?? DEFAULT_REF_KEY,
-    default_tags: { amenity: 'charging_station', ...opts.defaultTags },
+    default_tags: { amenity: 'charging_station', ...BRAND_TAGS, ...opts.defaultTags },
   }
   if (opts.permissionUrl !== undefined) metadata.permission_url = opts.permissionUrl
 

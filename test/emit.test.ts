@@ -21,14 +21,18 @@ describe('buildCollection', () => {
     expect(validateCollection(build())).toEqual([])
   })
 
-  test('safe defaults: pending licence, namespaced ref key, only amenity as default tag', () => {
+  test('safe defaults: pending licence, namespaced ref key, amenity and the NSI brand', () => {
     const d = build()
     expect(d.metadata).toMatchObject({
       format_version: '1',
       dataset_id: 'fines-charging-bg',
       licence: 'LicenseRef-pending',
       ref_key: 'ref:fines',
-      default_tags: { amenity: 'charging_station' },
+      default_tags: {
+        amenity: 'charging_station',
+        brand: 'Fines Charging',
+        'brand:wikidata': 'Q128904354',
+      },
       source_url: 'https://public.finescharging.com/v1/locations.geojson',
     })
     expect(d.metadata.permission_url).toBeUndefined()
@@ -46,7 +50,12 @@ describe('buildCollection', () => {
       permission_url: 'https://wiki.example/x',
       ref_key: 'ref',
     })
-    expect(d.metadata.default_tags).toEqual({ amenity: 'charging_station', network: 'X' })
+    expect(d.metadata.default_tags).toEqual({
+      amenity: 'charging_station',
+      brand: 'Fines Charging',
+      'brand:wikidata': 'Q128904354',
+      network: 'X',
+    })
     expect(validateCollection(d)).toEqual([])
   })
 

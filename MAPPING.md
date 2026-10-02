@@ -4,8 +4,8 @@ This document is the translation step the OSM import guidelines ask to be
 published. Every rule is implemented in [`src/mapping.ts`](src/mapping.ts) and
 covered by [`test/mapping.test.ts`](test/mapping.test.ts).
 
-**Status: draft — not yet reviewed by the OSM community or confirmed by Fines.**
-Items marked _open_ must be settled before any live upload.
+**Status: proposed for community review.** Items marked _open_ are settled in
+that review before any live upload.
 
 Sources: `https://public.finescharging.com/v1/locations.geojson` (locations) and
 `https://public.finescharging.com/v1/live.json` (connectors: charger, plug type,
@@ -17,11 +17,12 @@ Map only what is certain. When a field cannot be mapped confidently, the tag is
 left out and the reason goes into the candidate's `notes`, which the reviewer
 sees next to the row. Nothing is guessed.
 
-## Licence — _open, blocking_
+## Licence
 
-Until permission to use the data in OpenStreetMap is documented, the adapter
-emits `licence: "LicenseRef-pending"`, and osm-charge-review refuses live
-uploads. Once permission exists:
+Fines Charging has given written permission to use the data in OpenStreetMap.
+Until that permission is published on the import wiki page, the adapter emits
+`licence: "LicenseRef-pending"`, and osm-charge-review refuses live uploads.
+Once it is published:
 `--licence LicenseRef-permission --permission-url <wiki page>`.
 
 ## Dataset
@@ -30,7 +31,7 @@ uploads. Once permission exists:
 | ----------------- | ------------------------------------------------------------------- |
 | `dataset_id`      | `fines-charging-bg`                                                 |
 | `ref_key`         | `ref:fines` (_open_: confirm the namespace in the community review) |
-| `default_tags`    | `amenity=charging_station` only (see Operator, network, brand)      |
+| `default_tags`    | `amenity=charging_station`, plus the brand tags (see Brand)         |
 
 ## Per location
 
@@ -66,22 +67,20 @@ Keys verified against <https://wiki.openstreetmap.org/wiki/Key:socket>.
 | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`                                           | See above.                                                                                                                              |
 | `capacity`                                       | The number of vehicles that can charge at once is not the connector count (a dual-cable charger often serves one car). Not in the feed. |
-| `operator`, `network`, `brand`                   | _Open._ See below.                                                                                                                      |
+| `operator`, `network`                            | See Brand.                                                                                                                              |
 | `charge`                                         | Volatile.                                                                                                                               |
 | `opening_hours`, `authentication:*`, `payment:*` | Not in the feed. Existing values in OSM are always kept.                                                                                |
 | `source`                                         | Belongs on the changeset, never on objects.                                                                                             |
 
-## Operator, network, brand — _open, blocking_
+## Brand
 
-These are not mapped until the correct values are confirmed. Values are copied
-from the [Name Suggestion Index](https://nsi.guide/) where Fines has an entry,
-never invented. Until then, `default_tags` contains only
-`amenity=charging_station`. Pass confirmed values with `--config`
-(`{"defaultTags": {"network": "…"}}`).
+Every station gets `brand=Fines Charging` and `brand:wikidata=Q128904354`,
+copied verbatim from the [Name Suggestion Index](https://nsi.guide/) entry
+for Fines Charging, so the values match what editors suggest.
 
-The Name Suggestion Index has a _brand_ entry for Fines
-(`brand=Fines Charging`, `brand:wikidata=Q128904354`), ready to use as
-[`config/nsi-brand.json`](config/nsi-brand.json).
+`operator` and `network` are not mapped: the Name Suggestion Index has no entry
+for them, and they are not invented. Existing values in OSM are kept. Other
+values can be passed with `--config` (`{"defaultTags": {"operator": "…"}}`).
 
 ## Not used from the API
 

@@ -7,7 +7,6 @@ import { feature, feedDoc } from './helpers.ts'
 const feed = parseFinesFeed(feedDoc([feature(2), feature(10, { restricted: true })]))
 const doc = buildCollection(feed, {
   retrievedAt: '2026-09-28T22:00:16.000Z',
-  defaultTags: { brand: 'Fines Charging', 'brand:wikidata': 'Q128904354' },
 }) as unknown as Parameters<typeof toOsmXml>[0]
 
 describe('toOsmXml (JOSM reference layer)', () => {
