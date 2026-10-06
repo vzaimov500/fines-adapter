@@ -195,6 +195,12 @@
           "minProperties": 1,
           "tsType": "OsmTags"
         },
+        "suggested_tags": {
+          "description": "Tags offered only when updating an existing object, never written to a new one. Each needs the reviewer's explicit tick. Keys already in the effective tags are ignored.",
+          "type": "object",
+          "$ref": "#/$defs/Tags",
+          "tsType": "OsmTags"
+        },
         "label": {
           "description": "Display only. Never written to OpenStreetMap.",
           "type": "string",

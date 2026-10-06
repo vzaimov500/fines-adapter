@@ -51,7 +51,42 @@ export const AC_MAX_KW = 43
 
 export interface MappedLocation {
   tags: Record<string, string>
+  /** Offered only when updating an existing station (never on a new one). */
+  suggestedTags: Record<string, string>
   notes: string[]
+}
+
+/** Socket types in the order and words mappers here use in `description`. */
+const DESCRIBE: readonly (readonly [string, string])[] = [
+  ['socket:type2_combo', 'DC CCS2'],
+  ['socket:type1_combo', 'DC CCS1'],
+  ['socket:mcs', 'DC MCS'],
+  ['socket:chademo', 'DC CHAdeMO'],
+  ['socket:type2_cable', 'AC Type2'],
+  ['socket:type2', 'AC Type2'],
+]
+
+/**
+ * The summary local mappers keep in `description`, e.g.
+ * "2x 300kW, 1x 50kW DC CCS2, 1x 22kW AC Type2": how many connectors have
+ * each power, which socket tags cannot say. Only from a complete connector list.
+ */
+export function describeSockets(powers: ReadonlyMap<string, readonly number[]>): string {
+  const byLabel = new Map<string, number[]>()
+  for (const [socket, label] of DESCRIBE) {
+    const kws = powers.get(socket)
+    if (kws) byLabel.set(label, [...(byLabel.get(label) ?? []), ...kws])
+  }
+  return [...byLabel]
+    .map(([label, kws]) => {
+      const counts = new Map<number, number>()
+      for (const kw of kws) counts.set(kw, (counts.get(kw) ?? 0) + 1)
+      const parts = [...counts]
+        .sort(([a], [b]) => b - a)
+        .map(([kw, n]) => `${n}x ${formatKw(kw).replace(' ', '')}`)
+      return `${parts.join(', ')} ${label}`
+    })
+    .join(', ')
 }
 
 /** "22 kW", "7.4 kW" — OSM convention: number, space, unit; no trailing zeros. */
@@ -88,14 +123,16 @@ export function mapLocation(
   connectors?: readonly FinesConnector[],
 ): MappedLocation {
   const tags: Record<string, string> = {}
+  const suggestedTags: Record<string, string> = {}
   const notes: string[] = []
 
   const branch = branchFromName(loc.name)
   if (branch) tags.branch = branch
 
-  if (connectors !== undefined && matchesSummary(loc, connectors, notes))
-    socketsFromConnectors(connectors, tags, notes)
-  else socketsFromSummary(loc, tags, notes)
+  if (connectors !== undefined && matchesSummary(loc, connectors, notes)) {
+    const description = socketsFromConnectors(connectors, tags, notes)
+    if (description) suggestedTags.description = description
+  } else socketsFromSummary(loc, tags, notes)
 
   // Access: `restricted: false` is documented as "not restricted or conditional".
   if (loc.restricted) {
@@ -112,7 +149,7 @@ export function mapLocation(
     else if (loc.priceRange.min === 0 && loc.priceRange.max === 0) tags.fee = 'no'
   }
 
-  return { tags, notes }
+  return { tags, suggestedTags, notes }
 }
 
 /** The per-connector list must count the same plug types as the location summary. */
@@ -134,22 +171,28 @@ function matchesSummary(
   return same
 }
 
-/** Counts and powers per socket type, connector by connector. */
+/**
+ * Counts and powers per socket type, connector by connector. Returns the
+ * `description` summary when every connector was tagged with its power.
+ */
 function socketsFromConnectors(
   connectors: readonly FinesConnector[],
   tags: Record<string, string>,
   notes: string[],
-): void {
+): string | undefined {
   const powers = new Map<string, (number | null)[]>()
+  let complete = true
   const unmapped = new Map<string, number>()
   for (const c of connectors) {
     const isMcs = c.name !== null && MCS_NAME.test(c.name)
     const socket = isMcs ? 'socket:mcs' : SOCKET_KEYS[c.plugType]
     if (socket === undefined) {
       unmapped.set(c.plugType, (unmapped.get(c.plugType) ?? 0) + 1)
+      complete = false
       continue
     }
     if (DC_SOCKETS.has(socket) && c.name !== null && /^AC\b/i.test(c.name)) {
+      complete = false
       notes.push(
         `connector "${c.name.trim()}" is listed as ${c.plugType}, a DC plug — the plug type looks wrong; not tagged, please survey`,
       )
@@ -167,6 +210,7 @@ function socketsFromConnectors(
     tags[socket] = String(kws.length)
     if (kws.some((kw) => kw === null)) {
       notes.push(`power missing for some ${label(socket)} connectors — output not tagged`)
+      complete = false
       continue
     }
     const max = maxKwFor(socket)
@@ -175,12 +219,16 @@ function socketsFromConnectors(
       notes.push(
         `feed advertises ${formatKw(Math.max(...tooHigh))} on a ${label(socket)} connector (plausible up to ${max} kW) — output not tagged`,
       )
+      complete = false
       continue
     }
     // Several powers: all of them, highest first, as mappers here already write it.
     const distinct = [...new Set(kws as number[])].sort((a, b) => b - a)
     tags[`${socket}:output`] = distinct.map(formatKw).join(';')
   }
+  return complete && powers.size > 0
+    ? describeSockets(powers as ReadonlyMap<string, number[]>)
+    : undefined
 }
 
 /** Only the location summary: counts per plug type and one maximum for the whole site. */

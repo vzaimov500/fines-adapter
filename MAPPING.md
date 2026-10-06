@@ -62,6 +62,23 @@ Keys verified against <https://wiki.openstreetmap.org/wiki/Key:socket>.
 | Small Paddle Inductive            | **not mapped**: obsolete Magne Charge, almost certainly a data-entry error. Note added.      |
 | anything else                     | **not mapped**, note added.                                                                  |
 
+## Suggested when updating: `description`
+
+Most mapped Fines stations carry a `description` summarising their sockets,
+such as `2x 240kW DC CCS2, 1x 22kW AC Type2`. It holds what socket tags
+cannot: how many connectors have each power. The adapter builds the same
+summary from the per-connector list and sends it as `suggested_tags`:
+
+- offered only when **updating** an existing station, unticked, next to the
+  current value; the reviewer ticks or edits it;
+- **never** written to a new station (the socket tags already say it);
+- left out when the connector list is incomplete (a missing or implausible
+  power, an unmapped plug), so it never understates a site.
+
+Format: per socket type, connectors per power, highest first, then the type —
+`DC CCS2`, `DC CCS1`, `DC MCS`, `DC CHAdeMO`, `AC Type2` (with or without
+cable).
+
 ## Not mapped (deliberately)
 
 | OSM key                                          | Why not                                                                                                                                 |

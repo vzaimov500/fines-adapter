@@ -76,6 +76,33 @@ describe('buildCollection', () => {
     expect(build().features[2]!.properties.notes).toBeUndefined()
   })
 
+  test('the suggested description travels as suggested_tags and is schema-valid', () => {
+    const feed = parseFinesFeed(
+      feedDoc([feature(10, { connectors: { 'CCS Combo 2 Plug (Cable Attached)': 1 } })]),
+    )
+    const live = new Map([
+      [
+        10,
+        [
+          {
+            chargerId: 1,
+            name: 'CCS 1',
+            plugType: 'CCS Combo 2 Plug (Cable Attached)',
+            maxPowerKw: 150,
+          },
+        ],
+      ],
+    ])
+    const d = buildCollection(feed, { retrievedAt: '2026-10-06T00:00:00Z' }, live)
+    const p = (d.features as { properties: Record<string, unknown> }[])[0]!.properties
+    expect(p.suggested_tags).toEqual({ description: '1x 150kW DC CCS2' })
+    expect(validateCollection(d)).toEqual([])
+    const without = buildCollection(feed, { retrievedAt: '2026-10-06T00:00:00Z' })
+    expect(
+      (without.features as { properties: Record<string, unknown> }[])[0]!.properties.suggested_tags,
+    ).toBeUndefined()
+  })
+
   test('validation reports problems', () => {
     const d = build()
     ;(d.metadata as Record<string, unknown>).licence = 'not a licence!'

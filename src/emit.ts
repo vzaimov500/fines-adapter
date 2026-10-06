@@ -53,7 +53,7 @@ export function buildCollection(
     .sort((a, b) => a.id - b.id)
     .map((loc) => {
       const own = connectors?.get(loc.id)
-      const { tags, notes } = mapLocation(loc, own)
+      const { tags, suggestedTags, notes } = mapLocation(loc, own)
       if (connectors !== undefined && own === undefined)
         notes.unshift('location missing from the per-connector list — per-connector power not used')
       const properties: Record<string, unknown> = {
@@ -62,6 +62,7 @@ export function buildCollection(
         tags,
         source_raw: loc.raw,
       }
+      if (Object.keys(suggestedTags).length > 0) properties.suggested_tags = suggestedTags
       if (loc.name !== null) properties.label = loc.name
       if (loc.address !== null) properties.address = loc.address
       if (notes.length > 0) properties.notes = notes.join('\n')

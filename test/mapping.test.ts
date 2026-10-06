@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import type { FinesConnector, FinesLocation } from '../src/fines.ts'
-import { branchFromName, formatKw, mapLocation, SOCKET_KEYS } from '../src/mapping.ts'
+import {
+  branchFromName,
+  describeSockets,
+  formatKw,
+  mapLocation,
+  SOCKET_KEYS,
+} from '../src/mapping.ts'
 
 const loc = (over: Partial<FinesLocation> = {}): FinesLocation => ({
   id: 1,
@@ -264,5 +270,55 @@ describe('branch', () => {
     expect(tags.branch).toBe('Gelemenovo')
     expect(tags.name).toBeUndefined()
     expect(mapLocation(loc({ name: null })).tags.branch).toBeUndefined()
+  })
+})
+
+describe('suggested description (how many connectors have each power)', () => {
+  const CCS = 'CCS Combo 2 Plug (Cable Attached)'
+  const con = (name: string, plugType: string, maxPowerKw: number | null): FinesConnector => ({
+    chargerId: 1,
+    name,
+    plugType,
+    maxPowerKw,
+  })
+
+  test('in the format mappers here use; type2 and type2_cable both read "AC Type2"', () => {
+    const powers = new Map<string, number[]>([
+      ['socket:type2', [22]],
+      ['socket:type2_combo', [50, 300, 300]],
+      ['socket:chademo', [50]],
+      ['socket:type2_cable', [7.4]],
+      ['socket:mcs', [1000]],
+    ])
+    expect(describeSockets(powers)).toBe(
+      '2x 300kW, 1x 50kW DC CCS2, 1x 1000kW DC MCS, 1x 50kW DC CHAdeMO, 1x 22kW, 1x 7.4kW AC Type2',
+    )
+  })
+
+  test('a complete connector list gives a suggestion, never a tag', () => {
+    const r = mapLocation(loc({ connectors: { [CCS]: 2, 'Type 2 Outlet': 1 } }), [
+      con('CCS 1', CCS, 240),
+      con('CCS 2', CCS, 240),
+      con('AC', 'Type 2 Outlet', 22),
+    ])
+    expect(r.suggestedTags).toEqual({ description: '2x 240kW DC CCS2, 1x 22kW AC Type2' })
+    expect(r.tags.description).toBeUndefined()
+  })
+
+  test.each([
+    ['a missing power', [con('CCS 1', CCS, 120), con('CCS 2', CCS, null)], { [CCS]: 2 }],
+    ['an implausible power', [con('CCS 1', CCS, 5000)], { [CCS]: 1 }],
+    [
+      'an unmapped plug',
+      [con('CCS 1', CCS, 120), con('T3', 'Type 3 Outlet', 22)],
+      { [CCS]: 1, 'Type 3 Outlet': 1 },
+    ],
+    ['a DC plug named AC', [con('CCS 1', CCS, 120), con('AC 1', CCS, 22)], { [CCS]: 2 }],
+  ])('no suggestion with %s: it would not be the whole site', (_, cons, summary) => {
+    expect(mapLocation(loc({ connectors: summary }), cons).suggestedTags).toEqual({})
+  })
+
+  test('no suggestion from the summary alone', () => {
+    expect(mapLocation(loc()).suggestedTags).toEqual({})
   })
 })
