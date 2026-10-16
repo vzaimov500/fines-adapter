@@ -85,12 +85,13 @@ describe('parseFinesLive', () => {
   })
 
   test('reads charger, name, plug and power; ignores status', () => {
-    const m = parseFinesLive(
+    const { connectors: m, unusable } = parseFinesLive(
       live([
         connector(),
         connector({ station_id: 5, name: null, plug_type: 'CHAdeMO', max_power_kw: null }),
       ]),
     )
+    expect(unusable.size).toBe(0)
     expect(m.get(6)).toEqual([
       { chargerId: 5, name: 'CCS', plugType: 'CCS Combo 2 Plug (Cable Attached)', maxPowerKw: 80 },
       { chargerId: 5, name: null, plugType: 'CHAdeMO', maxPowerKw: null },
@@ -102,16 +103,29 @@ describe('parseFinesLive', () => {
     [{ schema_version: 2, locations: [] }, /unsupported schema_version/],
     [{ schema_version: 1, locations: {} }, /locations is not an array/],
     [{ schema_version: 1, locations: [{ location_id: 'x', connectors: [] }] }, /location_id/],
-    [
-      { schema_version: 1, locations: [{ location_id: 1, connectors: {} }] },
-      /connectors is not an array/,
-    ],
-    [live([connector({ station_id: 'a' })]), /station_id/],
-    [live([connector({ plug_type: 3 })]), /plug_type/],
-    [live([connector({ name: 3 })]), /name/],
-    [live([connector({ max_power_kw: 0 })]), /max_power_kw/],
   ])('rejects %j', (data, msg) => {
     expect(() => parseFinesLive(data)).toThrow(FeedError)
     expect(() => parseFinesLive(data)).toThrow(msg)
+  })
+
+  test.each([
+    [{}, /connectors is not an array/],
+    [{ connectors: [connector(), connector({ station_id: 'a' })] }, /connectors\[1\]: station_id/],
+    [{ connectors: [null] }, /station_id/],
+    [{ connectors: [connector({ plug_type: 3 })] }, /plug_type/],
+    [{ connectors: [connector({ name: 3 })] }, /name/],
+    [{ connectors: [connector({ max_power_kw: 0 })] }, /max_power_kw/],
+  ])('leaves out only the location with a bad connector list: %j', (bad, msg) => {
+    const data = {
+      schema_version: 1,
+      locations: [
+        { location_id: 1, ...bad },
+        { location_id: 6, connectors: [connector()] },
+      ],
+    }
+    const { connectors, unusable } = parseFinesLive(data)
+    expect(connectors.has(1)).toBe(false)
+    expect(unusable.get(1)).toMatch(msg)
+    expect(connectors.get(6)).toHaveLength(1)
   })
 })

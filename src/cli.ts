@@ -76,6 +76,7 @@ const feed = parseFinesFeed(JSON.parse(res.body))
 // the feed. Only the fixed facts are used, never the live status. Optional: on
 // failure, every location falls back to its summary and says so in its notes.
 let connectors: Map<number, FinesConnector[]> | undefined
+let unusable: Map<number, string> | undefined
 try {
   const live = await politeGet(FINES_LIVE_URL, {
     cacheDir: args['cache-dir'],
@@ -85,7 +86,9 @@ try {
     offline: args.offline,
     log,
   })
-  connectors = parseFinesLive(JSON.parse(live.body))
+  ;({ connectors, unusable } = parseFinesLive(JSON.parse(live.body)))
+  for (const [id, problem] of unusable)
+    log(`location ${id}: per-connector list unusable (${problem}); using its summary`)
 } catch (e) {
   log(
     `per-connector list unavailable (${e instanceof Error ? e.message : String(e)}); using location summaries only`,
@@ -96,7 +99,7 @@ if (args.licence) opts.licence = args.licence
 if (args['permission-url']) opts.permissionUrl = args['permission-url']
 if (args['ref-key']) opts.refKey = args['ref-key']
 
-const doc = buildCollection(feed, opts, connectors)
+const doc = buildCollection(feed, opts, connectors, unusable)
 const errors = validateCollection(doc)
 if (errors.length > 0) {
   log(

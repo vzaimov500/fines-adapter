@@ -141,4 +141,18 @@ describe('with the per-connector list', () => {
     expect(byId.get('2')!.notes).toMatch(/^location missing from the per-connector list/)
     expect(validateCollection(d)).toEqual([])
   })
+
+  test('a location whose list broke the contract uses its summary and says why', () => {
+    const d = buildCollection(
+      feed,
+      { retrievedAt: '2026-09-28T22:00:16.000Z' },
+      new Map(),
+      new Map([[2, 'connectors[1]: max_power_kw must be positive or null']]),
+    ) as { features: { properties: { source_id: string; notes?: string } }[] }
+    const f2 = d.features.find((f) => f.properties.source_id === '2')!
+    expect(f2.properties.notes).toMatch(
+      /^per-connector list unusable \(connectors\[1\]: max_power_kw must be positive or null\)/,
+    )
+    expect(validateCollection(d)).toEqual([])
+  })
 })

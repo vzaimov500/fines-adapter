@@ -125,35 +125,59 @@ export interface FinesConnector {
   maxPowerKw: number | null
 }
 
+export interface FinesLive {
+  /** Connectors per location id. */
+  connectors: Map<number, FinesConnector[]>
+  /**
+   * Locations left out because one of their connectors breaks the contract
+   * (e.g. a test charger with 0 kW), with the reason. They fall back to their
+   * location summary; the rest of the list is still used.
+   */
+  unusable: Map<number, string>
+}
+
 /** Connectors per location id, from the network-wide live response. */
-export function parseFinesLive(data: unknown): Map<number, FinesConnector[]> {
+export function parseFinesLive(data: unknown): FinesLive {
   if (!isObj(data)) throw new FeedError('live response is not an object')
   const v = data.schema_version
   if (!(SUPPORTED_SCHEMA_VERSIONS as readonly unknown[]).includes(v))
     throw new FeedError(`live: unsupported schema_version ${JSON.stringify(v)}`)
   if (!Array.isArray(data.locations)) throw new FeedError('live: locations is not an array')
-  const out = new Map<number, FinesConnector[]>()
+  const connectors = new Map<number, FinesConnector[]>()
+  const unusable = new Map<number, string>()
   data.locations.forEach((l: unknown, i) => {
     const at = (msg: string) => new FeedError(`live locations[${i}]: ${msg}`)
     if (!isObj(l) || !Number.isInteger(l.location_id)) throw at('location_id is not an integer')
-    if (!Array.isArray(l.connectors)) throw at('connectors is not an array')
-    out.set(
-      l.location_id as number,
-      l.connectors.map((c: unknown, j): FinesConnector => {
-        const bad = (msg: string) => at(`connectors[${j}]: ${msg}`)
-        if (!isObj(c) || !Number.isInteger(c.station_id)) throw bad('station_id is not an integer')
-        if (typeof c.plug_type !== 'string') throw bad('plug_type is not a string')
-        if (!strOrNull(c.name)) throw bad('name must be string or null')
-        if (c.max_power_kw !== null && !(isNum(c.max_power_kw) && c.max_power_kw > 0))
-          throw bad('max_power_kw must be positive or null')
-        return {
-          chargerId: c.station_id as number,
-          name: c.name,
-          plugType: c.plug_type,
-          maxPowerKw: c.max_power_kw as number | null,
-        }
-      }),
-    )
+    const id = l.location_id as number
+    if (!Array.isArray(l.connectors)) {
+      unusable.set(id, 'connectors is not an array')
+      return
+    }
+    const out: FinesConnector[] = []
+    for (const [j, c] of l.connectors.entries()) {
+      const problem = connectorProblem(c)
+      if (problem) {
+        unusable.set(id, `connectors[${j}]: ${problem}`)
+        return
+      }
+      const ok = c as Record<string, unknown>
+      out.push({
+        chargerId: ok.station_id as number,
+        name: ok.name as string | null,
+        plugType: ok.plug_type as string,
+        maxPowerKw: ok.max_power_kw as number | null,
+      })
+    }
+    connectors.set(id, out)
   })
-  return out
+  return { connectors, unusable }
+}
+
+function connectorProblem(c: unknown): string | undefined {
+  if (!isObj(c) || !Number.isInteger(c.station_id)) return 'station_id is not an integer'
+  if (typeof c.plug_type !== 'string') return 'plug_type is not a string'
+  if (!strOrNull(c.name)) return 'name must be string or null'
+  if (c.max_power_kw !== null && !(isNum(c.max_power_kw) && c.max_power_kw > 0))
+    return 'max_power_kw must be positive or null'
+  return undefined
 }

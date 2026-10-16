@@ -29,12 +29,14 @@ export const BRAND_TAGS = { brand: 'Fines Charging', 'brand:wikidata': 'Q1289043
 
 /**
  * `connectors` is the per-connector list from /v1/live.json, by location id.
- * Without it, sockets and power come from each location's summary only.
+ * Without it, sockets and power come from each location's summary only; so
+ * they do for the locations in `unusable`, whose list broke the contract.
  */
 export function buildCollection(
   feed: FinesFeed,
   opts: EmitOptions,
   connectors?: ReadonlyMap<number, readonly FinesConnector[]>,
+  unusable?: ReadonlyMap<number, string>,
 ): Record<string, unknown> {
   const metadata: Record<string, unknown> = {
     format_version: '1',
@@ -54,7 +56,10 @@ export function buildCollection(
     .map((loc) => {
       const own = connectors?.get(loc.id)
       const { tags, suggestedTags, notes } = mapLocation(loc, own)
-      if (connectors !== undefined && own === undefined)
+      const problem = unusable?.get(loc.id)
+      if (problem !== undefined)
+        notes.unshift(`per-connector list unusable (${problem}) — per-connector power not used`)
+      else if (connectors !== undefined && own === undefined)
         notes.unshift('location missing from the per-connector list — per-connector power not used')
       const properties: Record<string, unknown> = {
         source_id: String(loc.id),
